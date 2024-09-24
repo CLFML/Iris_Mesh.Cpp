@@ -30,3 +30,18 @@
 *.exe
 *.out
 *.app
+
+# External dependencies
+external/
+
+# IDE folders
+idea/
+.vscode/
+
+# Build folders
+build/
+Build/
+cmake-build-*/
+log/
+install/
+
