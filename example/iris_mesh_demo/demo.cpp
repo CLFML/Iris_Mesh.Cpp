@@ -24,6 +24,12 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/opencv.hpp>
 
+
+/**
+ * @brief Calculate the eye regions on the face by using two 2D-facial landmarks of the eye_center.
+ *        It uses the distance between the eye's as reference for how big the regions should be.
+ *        For most people it works, but it is a very crude and easy way!
+ */
 const std::array<cv::Rect, 2> calculate_eye_roi(const cv::Point &left_eye, const cv::Point &right_eye)
 {
     std::array<cv::Rect, 2> ret;
