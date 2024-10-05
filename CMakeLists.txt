@@ -83,13 +83,7 @@ if(CLFML_IRIS_MESH_BUILD_EXAMPLE_PROJECTS)
         GIT_REPOSITORY https://github.com/CLFML/Face_Detector.Cpp.git
         GIT_TAG main
     )
-  FetchContent_Declare(
-        face_mesh.cpp
-        GIT_REPOSITORY https://github.com/CLFML/Face_Mesh.Cpp.git
-        GIT_TAG main
-  )
   FetchContent_MakeAvailable(face_detector.cpp)
-  FetchContent_MakeAvailable(face_mesh.cpp)
   add_executable(iris_mesh_demo ${CMAKE_CURRENT_LIST_DIR}/example/iris_mesh_demo/demo.cpp)
-  target_link_libraries(iris_mesh_demo PUBLIC CLFML::${PROJECT_NAME} CLFML::face_detector CLFML::face_mesh)
+  target_link_libraries(iris_mesh_demo PUBLIC CLFML::${PROJECT_NAME} CLFML::face_detector)
 endif()

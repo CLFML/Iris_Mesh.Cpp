@@ -1,48 +1,45 @@
 /*
-*  Copyright 2024 (C) Jeroen Veen <ducroq> & Victor Hogeweij <Hoog-V>
-*
-*  Licensed under the Apache License, Version 2.0 (the "License");
-*  you may not use this file except in compliance with the License.
-*  You may obtain a copy of the License at
-*
-*  http://www.apache.org/licenses/LICENSE-2.0
-*
-*  Unless required by applicable law or agreed to in writing, software
-*  distributed under the License is distributed on an "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*  See the License for the specific language governing permissions and
-*  limitations under the License.
-*
-* This file is part of the Iris_Mesh.Cpp library
-*
-* Author:          Victor Hogeweij <Hoog-V>
-*
-*/
-#include <face_mesh.hpp>
+ *  Copyright 2024 (C) Jeroen Veen <ducroq> & Victor Hogeweij <Hoog-V>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ * This file is part of the Iris_Mesh.Cpp library
+ *
+ * Author:          Victor Hogeweij <Hoog-V>
+ *
+ */
 #include <face_detection.hpp>
 #include <iris_mesh.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/opencv.hpp>
 
-cv::Rect calculate_eye_roi(cv::Point3f &eye_left_side, cv::Point3f &eye_right_side) {
-    int center_x = (eye_left_side.x + eye_right_side.x)/2;
-    int center_y = (eye_left_side.y + eye_right_side.y)/2;
-    int width = std::abs(eye_left_side.x - eye_right_side.x);
-    int height = std::abs(eye_left_side.y - eye_right_side.y);
-    width = height = std::max(width, height);
-    return cv::Rect(center_x - width/2, center_y - height/2, width, height);
+const std::array<cv::Rect, 2> calculate_eye_roi(const cv::Point &left_eye, const cv::Point &right_eye)
+{
+    std::array<cv::Rect, 2> ret;
+    int roi_size = ((right_eye.x - left_eye.x)/2); 
+    ret.at(0) = cv::Rect(left_eye.x-(roi_size/2), left_eye.y-(roi_size/2), roi_size, roi_size);
+    ret.at(1) = cv::Rect(right_eye.x-(roi_size/2), right_eye.y-(roi_size/2), roi_size, roi_size);
+    return ret;
 }
-
-
 
 int main(int argc, char *argv[])
 {
     /* Initialize camera */
     const uint8_t camera_index = 0;
     const uint16_t camera_fps = 30;
-    const uint32_t width = 1280;
-    const uint32_t height = 720;
+    const uint32_t width = 640;
+    const uint32_t height = 480;
     cv::VideoCapture cam(camera_index);
 
     if (cam.isOpened() == false)
@@ -55,12 +52,10 @@ int main(int argc, char *argv[])
     cam.set(cv::CAP_PROP_FRAME_HEIGHT, height);
     cam.set(cv::CAP_PROP_FRAME_COUNT, camera_fps);
 
-    static CLFML::FaceDetection::FaceDetector face_det;
-    static CLFML::FaceMesh::FaceMesh mesh_det;
-    static CLFML::IrisMesh::IrisMesh iris_det;
+    CLFML::FaceDetection::FaceDetector face_det;
+    CLFML::IrisMesh::IrisMesh iris_det;
 
     face_det.load_model(CFML_FACE_DETECTOR_CPU_MODEL_PATH);
-    mesh_det.load_model(CFML_FACE_MESH_CPU_MODEL_PATH);
     iris_det.load_model(CLFML_IRIS_MESH_CPU_MODEL_PATH);
 
     /* Create window to show the face roi */
@@ -83,7 +78,7 @@ int main(int argc, char *argv[])
         int face_detected = face_det.detected() + 1; // +1 because it returns -1 for no face and 0 for face detected!
                                                      /* Get the face roi rectangle */
         cv::Rect face_roi = face_det.get_face_roi();
-        
+
         if (face_detected)
         {
             if (face_roi.x >= 0 && face_roi.y >= 0 &&
@@ -91,7 +86,6 @@ int main(int argc, char *argv[])
                 face_roi.y + face_roi.height <= cam_frame.rows)
             {
                 cv::Mat cropped_image_to_roi = cam_frame(face_roi);
-                mesh_det.load_image(cropped_image_to_roi, face_roi);
 
                 /* Draw the face roi rectangle on the captured camera frame */
                 cv::rectangle(cam_frame, face_roi, cv::Scalar(0, 255, 0), 2); // Green rectangle will be drawn around detected face
@@ -104,15 +98,11 @@ int main(int argc, char *argv[])
                     cv::circle(cam_frame, keypoint, 2, cv::Scalar(0, 255, 0), -1);
                 }
 
-                std::array<cv::Point3f, CLFML::FaceMesh::NUM_OF_FACE_MESH_POINTS> face_mesh_keypoints = mesh_det.get_face_mesh_points();
+                std::array<cv::Rect, 2> iris_rois = calculate_eye_roi(face_keypoints[0], face_keypoints[1]);
 
-                /* Draw the face landmarks on top of the captured camera frame */
-                for (cv::Point3f keypoint : face_mesh_keypoints)
-                {
-                    cv::circle(cam_frame, cv::Point(keypoint.x, keypoint.y), 2, cv::Scalar(0, 255, 0), -1);
-                }
-                
-                cv::Rect left_eye_roi = calculate_eye_roi(face_mesh_keypoints[446], face_mesh_keypoints[464]);
+                cv::rectangle(cam_frame, iris_rois.at(0), cv::Scalar(255, 0, 0), 2); // Green rectangle will be drawn around detected eye
+            
+                cv::Rect left_eye_roi = iris_rois.at(0);
                 cv::rectangle(cam_frame, left_eye_roi, cv::Scalar(255, 0, 0), 2); // Green rectangle will be drawn around detected eye
                 iris_left_eye = cam_frame(left_eye_roi);
                 iris_det.load_image(iris_left_eye, left_eye_roi);
@@ -120,10 +110,10 @@ int main(int argc, char *argv[])
 
                 for (cv::Point3f keypoint : iris_mesh_keypoints)
                 {
-                    cv::circle(cam_frame, cv::Point(keypoint.x, keypoint.y), 2, cv::Scalar(0, 255, 0), -1);
+                     cv::circle(cam_frame, cv::Point(keypoint.x, keypoint.y), 2, cv::Scalar(0, 255, 0), -1);
                 }
 
-                cv::Rect right_eye_roi = calculate_eye_roi(face_mesh_keypoints[244], face_mesh_keypoints[226]);
+                cv::Rect right_eye_roi = iris_rois.at(1);
                 cv::rectangle(cam_frame, right_eye_roi, cv::Scalar(255, 0, 0), 2); // Green rectangle will be drawn around detected eye
                 iris_right_eye = cam_frame(right_eye_roi);
                 iris_det.load_image(iris_right_eye, right_eye_roi);

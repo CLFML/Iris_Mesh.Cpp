@@ -57,7 +57,7 @@ namespace CLFML::IrisMesh
          * @param delegate_type The delegate to use for inference (CPU only for now) (default = CPU)
          * @param num_of_threads The number of CPU threads which can be used by the inference runtime (default= 4 threads)
          */
-        void load_model(const std::string model_path, const face_mesh_delegate delegate_type = face_mesh_delegate::CPU, const uint8_t num_of_threads = 4);
+        void load_model(const std::string model_path, const face_mesh_delegate delegate_type = face_mesh_delegate::CPU, const uint8_t num_of_threads = 1);
 
         /**
          * @brief Loads image into model and does inference
