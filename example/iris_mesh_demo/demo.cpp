@@ -27,9 +27,9 @@
 const std::array<cv::Rect, 2> calculate_eye_roi(const cv::Point &left_eye, const cv::Point &right_eye)
 {
     std::array<cv::Rect, 2> ret;
-    int roi_size = ((right_eye.x - left_eye.x)/2); 
-    ret.at(0) = cv::Rect(left_eye.x-(roi_size/2), left_eye.y-(roi_size/2), roi_size, roi_size);
-    ret.at(1) = cv::Rect(right_eye.x-(roi_size/2), right_eye.y-(roi_size/2), roi_size, roi_size);
+    int roi_size = ((right_eye.x - left_eye.x) / 2);
+    ret.at(0) = cv::Rect(left_eye.x - (roi_size / 2), left_eye.y - (roi_size / 2), roi_size, roi_size);
+    ret.at(1) = cv::Rect(right_eye.x - (roi_size / 2), right_eye.y - (roi_size / 2), roi_size, roi_size);
     return ret;
 }
 
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     cv::namedWindow("Display window", cv::WINDOW_NORMAL);
     cv::resizeWindow("Display window", width, height);
 
-    cv::Mat cam_frame, iris_left_eye, iris_right_eye;
+    cv::Mat cam_frame, iris_roi_frame;
     while (true)
     {
         /* If no frame captured? Try again! */
@@ -76,48 +76,39 @@ int main(int argc, char *argv[])
 
         /* Get face_detected value */
         int face_detected = face_det.detected() + 1; // +1 because it returns -1 for no face and 0 for face detected!
-                                                     /* Get the face roi rectangle */
+
+        /* Get the face roi rectangle */
         cv::Rect face_roi = face_det.get_face_roi();
 
         if (face_detected)
         {
-            if (face_roi.x >= 0 && face_roi.y >= 0 &&
-                face_roi.x + face_roi.width <= cam_frame.cols &&
-                face_roi.y + face_roi.height <= cam_frame.rows)
+            /* Draw the face roi rectangle on the captured camera frame */
+            cv::rectangle(cam_frame, face_roi, cv::Scalar(0, 255, 0), 2); // Green rectangle will be drawn around detected face
+
+            /* Get the face landmarks for eye-roi calculation */
+            std::array<cv::Point, CLFML::FaceDetection::NUM_OF_FACE_DETECTOR_LANDMARKS> face_keypoints = face_det.get_face_landmarks();
+
+            /* Draw the face landmarks on top of the captured camera frame */
+            for (cv::Point keypoint : face_keypoints)
             {
-                cv::Mat cropped_image_to_roi = cam_frame(face_roi);
+                cv::circle(cam_frame, keypoint, 2, cv::Scalar(0, 255, 0), -1);
+            }
 
-                /* Draw the face roi rectangle on the captured camera frame */
-                cv::rectangle(cam_frame, face_roi, cv::Scalar(0, 255, 0), 2); // Green rectangle will be drawn around detected face
-                /* Get the face landmarks */
-                std::array<cv::Point, 6> face_keypoints = face_det.get_face_landmarks();
+            /* Calculate the Eye-regions of interest on the face using the facial keypoints */
+            std::array<cv::Rect, 2> eye_rois = calculate_eye_roi(face_keypoints[0], face_keypoints[1]);
 
-                /* Draw the face landmarks on top of the captured camera frame */
-                for (cv::Point keypoint : face_keypoints)
-                {
-                    cv::circle(cam_frame, keypoint, 2, cv::Scalar(0, 255, 0), -1);
-                }
-
-                std::array<cv::Rect, 2> iris_rois = calculate_eye_roi(face_keypoints[0], face_keypoints[1]);
-
-                cv::rectangle(cam_frame, iris_rois.at(0), cv::Scalar(255, 0, 0), 2); // Green rectangle will be drawn around detected eye
-            
-                cv::Rect left_eye_roi = iris_rois.at(0);
-                cv::rectangle(cam_frame, left_eye_roi, cv::Scalar(255, 0, 0), 2); // Green rectangle will be drawn around detected eye
-                iris_left_eye = cam_frame(left_eye_roi);
-                iris_det.load_image(iris_left_eye, left_eye_roi);
+            /* Do inference for both Eye's and draw the iris keypoints on the camera frame */
+            for (cv::Rect &eye_roi : eye_rois)
+            {
+                /* Draw the eye_roi on the camera frame */
+                cv::rectangle(cam_frame, eye_roi, cv::Scalar(255, 0, 0), 2);
+                /* Crop the eye_roi region from the camera frame */
+                iris_roi_frame = cam_frame(eye_roi);
+                /* Do inference! */
+                iris_det.load_image(iris_roi_frame, eye_roi);
+                /* Get the iris mesh keypoints from the model inference output */
                 std::array<cv::Point3f, CLFML::IrisMesh::NUM_OF_IRIS_MESH_POINTS> iris_mesh_keypoints = iris_det.get_iris_mesh_points();
-
-                for (cv::Point3f keypoint : iris_mesh_keypoints)
-                {
-                     cv::circle(cam_frame, cv::Point(keypoint.x, keypoint.y), 2, cv::Scalar(0, 255, 0), -1);
-                }
-
-                cv::Rect right_eye_roi = iris_rois.at(1);
-                cv::rectangle(cam_frame, right_eye_roi, cv::Scalar(255, 0, 0), 2); // Green rectangle will be drawn around detected eye
-                iris_right_eye = cam_frame(right_eye_roi);
-                iris_det.load_image(iris_right_eye, right_eye_roi);
-                iris_mesh_keypoints = iris_det.get_iris_mesh_points();
+                /* Draw the iris keypoints on the camera frame (as 2D points) */
                 for (cv::Point3f keypoint : iris_mesh_keypoints)
                 {
                     cv::circle(cam_frame, cv::Point(keypoint.x, keypoint.y), 2, cv::Scalar(0, 255, 0), -1);
@@ -127,8 +118,10 @@ int main(int argc, char *argv[])
 
         /* Convert the face_detected integer to string */
         const std::string top_left_text = "Detected: " + std::to_string(face_detected);
+
         /* Draw (red) text in corner of frame telling whether a face has been detected; 0 no face, 1 face has been detected */
         cv::putText(cam_frame, top_left_text, cv::Point(20, 70), cv::FONT_HERSHEY_PLAIN, 3, cv::Scalar(0, 0, 255), 2);
+
         /* Update the window with the newly made image */
         cv::imshow("Display window", cam_frame);
 

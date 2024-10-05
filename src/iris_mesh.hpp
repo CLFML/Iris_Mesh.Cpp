@@ -70,6 +70,11 @@ namespace CLFML::IrisMesh
         /**
          * @brief Get the 3D landmarks from the model
          * @return Array with 5x3D Iris landmarks;
+         *         Index 0: Iris Center
+         *         Index 1: Pupil Right
+         *         Index 2: Pupil Top
+         *         Index 3: Pupil Left
+         *         Index 4: Pupil Bottom
          */
         std::array<cv::Point3f, NUM_OF_IRIS_MESH_POINTS> get_iris_mesh_points();
 
