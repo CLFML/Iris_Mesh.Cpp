@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
     CLFML::FaceDetection::FaceDetector face_det;
     CLFML::IrisMesh::IrisMesh iris_det;
 
-    face_det.load_model(CFML_FACE_DETECTOR_CPU_MODEL_PATH);
+    face_det.load_model(CLFML_FACE_DETECTOR_CPU_MODEL_PATH);
     iris_det.load_model(CLFML_IRIS_MESH_CPU_MODEL_PATH);
 
     /* Create window to show the face roi */
