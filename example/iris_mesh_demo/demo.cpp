@@ -39,6 +39,20 @@ const std::array<cv::Rect, 2> calculate_eye_roi(const cv::Point &left_eye, const
     return ret;
 }
 
+/**
+ * @brief Check if the given ROI is within the bounds of the image.
+ * 
+ * @param roi The region of interest to check.
+ * @param image The image in which the ROI should be checked.
+ * @return true if the ROI is within the bounds of the image, false otherwise.
+ */
+bool is_roi_within_bounds(const cv::Rect &roi, const cv::Mat &image)
+{
+    return (roi.x >= 0 && roi.y >= 0 && 
+            roi.x + roi.width <= image.cols && 
+            roi.y + roi.height <= image.rows);
+}
+
 int main(int argc, char *argv[])
 {
     /* Initialize camera */
@@ -97,28 +111,40 @@ int main(int argc, char *argv[])
             /* Draw the face landmarks on top of the captured camera frame */
             for (cv::Point keypoint : face_keypoints)
             {
-                cv::circle(cam_frame, keypoint, 2, cv::Scalar(0, 255, 0), -1);
+               cv::circle(cam_frame, keypoint, 2, cv::Scalar(0, 255, 0), -1);
             }
 
             /* Calculate the Eye-regions of interest on the face using the facial keypoints */
             std::array<cv::Rect, 2> eye_rois = calculate_eye_roi(face_keypoints[0], face_keypoints[1]);
 
+            uint8_t eye_index = 0; // for this demo 0 is left eye and 1 is right eye
+
             /* Do inference for both Eye's and draw the iris keypoints on the camera frame */
             for (cv::Rect &eye_roi : eye_rois)
             {
-                /* Draw the eye_roi on the camera frame */
-                cv::rectangle(cam_frame, eye_roi, cv::Scalar(255, 0, 0), 2);
-                /* Crop the eye_roi region from the camera frame */
-                iris_roi_frame = cam_frame(eye_roi);
-                /* Do inference! */
-                iris_det.load_image(iris_roi_frame, eye_roi);
-                /* Get the iris mesh keypoints from the model inference output */
-                std::array<cv::Point3f, CLFML::IrisMesh::NUM_OF_IRIS_MESH_POINTS> iris_mesh_keypoints = iris_det.get_iris_mesh_points();
-                /* Draw the iris keypoints on the camera frame (as 2D points) */
-                for (cv::Point3f keypoint : iris_mesh_keypoints)
+                        /* Check if the eye_roi is within the bounds of the image */
+                if (is_roi_within_bounds(eye_roi, cam_frame))
                 {
+                    /* Draw the eye_roi on the camera frame */
+                    cv::rectangle(cam_frame, eye_roi, cv::Scalar(255, 0, 0), 2);
+                    /* Crop the eye_roi region from the camera frame */
+                    iris_roi_frame = cam_frame(eye_roi);
+                    /* Do inference! */
+                    iris_det.load_image(iris_roi_frame, eye_roi);
+                    /* Get the iris mesh keypoints from the model inference output */
+                    std::array<cv::Point3f, CLFML::IrisMesh::NUM_OF_IRIS_MESH_POINTS> iris_mesh_keypoints = iris_det.get_iris_mesh_points();
+                    /* Draw the iris keypoints on the camera frame (as 2D points) */
+                    for (cv::Point3f keypoint : iris_mesh_keypoints)
+                    {
                     cv::circle(cam_frame, cv::Point(keypoint.x, keypoint.y), 2, cv::Scalar(0, 255, 0), -1);
+                    }
                 }
+                else
+                {
+                    std::string eye_label = (eye_index == 0) ? "Left" : "Right";
+                    std::cerr << "Warning: " << eye_label <<" eye ROI is out of image bounds and will be skipped." << std::endl;
+                }
+                ++eye_index;
             }
         }
 
